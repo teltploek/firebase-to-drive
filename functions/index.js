@@ -84,7 +84,6 @@ exports.moveToGoogleDrive = functions.storage.object().onChange(event => {
     console.log('Image downloaded locally to', tempFilePath);
 
     return jwtClient.authorize();
-    //return spawn('convert', [tempFilePath, '-thumbnail', '200x200>', tempFilePath]);
   }).then(() => {
     console.log('JWT client authorized');
 
