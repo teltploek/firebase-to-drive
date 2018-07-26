@@ -26,21 +26,17 @@ const google = require('googleapis');
 const key = require('./config.json');
 // [END import]
 
-// [START moveToGoogleDrive]
+// [START moveToGoogleDrive2]
 /**
 * When an image is uploaded in the Storage bucket We move it to Google Drive folder
 */
-// [START moveToGoogleDriveTrigger]
-exports.moveToGoogleDrive = functions.storage.object().onChange(event => {
-    // [END moveToGoogleDriveTrigger]
-    // [START eventAttributes]
-    const object = event.data; // The Storage object.
-    
+// [START moveToGoogleDrive2Trigger]
+exports.moveToGoogleDrive2 = functions.storage.object().onFinalize((object) => {
+    // [END moveToGoogleDrive2Trigger]
+    // [START eventAttributes]    
     const fileBucket = object.bucket; // The Storage bucket that contains the file.
     const filePath = object.name; // File path in the bucket.
     const contentType = object.contentType; // File content type.
-    const resourceState = object.resourceState; // The resourceState is 'exists' or 'not_exists' (for file/folder deletions).
-    const metageneration = object.metageneration; // Number of times metadata has been generated. New objects have a value of 1.
     // [END eventAttributes]
     
     // [START stopConditions]
@@ -49,6 +45,7 @@ exports.moveToGoogleDrive = functions.storage.object().onChange(event => {
         console.log('This is not an image.');
         return;
     }
+    // [END stopConditions]
     
     // Get the file name.
     const fileName = path.basename(filePath);
@@ -60,20 +57,6 @@ exports.moveToGoogleDrive = functions.storage.object().onChange(event => {
         ['https://www.googleapis.com/auth/drive'], // an array of auth scopes
         null
     );
-    
-    // Exit if this is a move or deletion event.
-    if (resourceState === 'not_exists') {
-        console.log('This is a deletion event.');
-        return;
-    }
-    
-    // Exit if file exists but is not new and is only being triggered
-    // because of a metadata change.
-    if (resourceState === 'exists' && metageneration > 1) {
-        console.log('This is a metadata change event.');
-        return;
-    }
-    // [END stopConditions]
     
     // [START uploadToDrive]
     // Download file from bucket.
@@ -99,22 +82,32 @@ exports.moveToGoogleDrive = functions.storage.object().onChange(event => {
             name: fileName,
             parents: [key.drive_folder]
         };
+
         const media = {
             mimeType: 'image/jpeg',
             body: fs.createReadStream(tempFilePath)
         };
+        console.log('Trying to upload', fileMetadata, 'to Google Drive...');
         
         return drive.files.create({
             resource: fileMetadata,
             media: media,
             fields: 'id'
-        });
-        
+        }, function (err, file) {
+            if (err) {
+              // Handle error
+              console.log('An error occurred when trying to upload file to Google Drive:');
+              console.error(err);
+            } else {
+              console.log('File Id: ', file.id);
+            }
+        });      
     })
     .then(() => fs.unlinkSync(tempFilePath))
     .then(() => {
+        console.log('Deleting locally downloaded file');
         return bucket.file(filePath).delete();
     });
     // [END uploadToDrive]
 });
-// [END moveToGoogleDrive]
+// [END moveToGoogleDrive2]
