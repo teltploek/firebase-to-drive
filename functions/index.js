@@ -37,6 +37,8 @@ exports.moveToGoogleDrive2 = functions.storage.object().onFinalize((object) => {
     const fileBucket = object.bucket; // The Storage bucket that contains the file.
     const filePath = object.name; // File path in the bucket.
     const contentType = object.contentType; // File content type.
+    const fileSize = object.size;
+    const dontUpload = fileSize < 250000;
     // [END eventAttributes]
     
     // [START stopConditions]
@@ -87,21 +89,26 @@ exports.moveToGoogleDrive2 = functions.storage.object().onFinalize((object) => {
             mimeType: 'image/jpeg',
             body: fs.createReadStream(tempFilePath)
         };
-        console.log('Trying to upload', fileMetadata, 'to Google Drive...');
-        
-        return drive.files.create({
-            resource: fileMetadata,
-            media: media,
-            fields: 'id'
-        }, function (err, file) {
-            if (err) {
-              // Handle error
-              console.log('An error occurred when trying to upload file to Google Drive:');
-              console.error(err);
-            } else {
-              console.log('File Id: ', file.id);
-            }
-        });      
+
+        if (dontUpload) {
+            console.log('Filesize is too low, only', (fileSize/1000), 'kb... skipping upload.');
+        }else{            
+            console.log('Trying to upload', fileMetadata, 'to Google Drive...');
+
+            return drive.files.create({
+                resource: fileMetadata,
+                media: media,
+                fields: 'id'
+            }, function (err, file) {
+                if (err) {
+                // Handle error
+                console.log('An error occurred when trying to upload file to Google Drive:');
+                console.error(err);
+                } else {
+                console.log('File Id: ', file.id);
+                }
+            });  
+        }  
     })
     .then(() => fs.unlinkSync(tempFilePath))
     .then(() => {
